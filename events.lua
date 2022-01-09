@@ -107,7 +107,7 @@ function interrups(timeout)
 	while Events.queue:size() > 0 do
 		local entry = Events.queue:pop()
 		--local e,s,a,b,c = Events:pull(event.pull(0.0))
-		src = Events.handlers[entry.src.hash]
+		local src = Events.handlers[entry.src.hash]
 		
 		if (src ~= nil) then
 			if (src[entry.ev] ~= nil) then
