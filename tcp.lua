@@ -68,7 +68,7 @@ TCP = class(function(p, target, ip)
 	if type(target) == 'string' then
 		target = component.proxy(target)
 	end
-	if target == nil or target:getType().name ~= 'NetworkCard_C' then error("Invalid target", 2) end
+	if target == nil or target:getType().name ~= 'NetworkCard_C' then error("Invalid target", 3) end
 	p.nc = target
 	p.ip = ip or target.id
 	p.cons = {}

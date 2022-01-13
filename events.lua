@@ -1,7 +1,18 @@
---- Event System
----
---- Beispiel: Events:add(component, "EventName", function, context)
----
+--[[
+Event System 
+
+-- Beispiele:
+callback = function(evt, ...)
+Events:add(component, "EventName", callback, context)
+-- "context" ist optional und bezeichnet entweder das self Objekt im Callback, oder falls nicht angegeben die Komponente.
+
+Events:remove(component, "EventName", callback)
+-- oder
+Events:removeAll(component)
+
+-- Statt event.pull wird im Event interrups verwendet.
+interrups()
+--]]
 require 'queue'
 _G.Events = {
 	queue = Queue(),
@@ -36,7 +47,6 @@ function Events:add(component, ev, func, context)
 		else
 			self.handlers[chash][ev][func] = eventHandle
 		end
-		--log("new handle für", __proc.name)
 	end, error_handler)
 end
 
@@ -56,6 +66,16 @@ function Events:remove(component, ev, func)
 					self.handlers[chash] = nil
 				end
 			end
+		end
+	end, error_handler)
+end
+
+function Events:removeAll(component)
+	if (component == nil) then error("component is nil", 2) end
+	xpcall(function()
+		local chash = component.hash
+		if (self.handlers[chash] ~= nil) then
+			self.handlers[chash] = nil
 		end
 	end, error_handler)
 end
@@ -106,7 +126,6 @@ function interrups(timeout)
 
 	while Events.queue:size() > 0 do
 		local entry = Events.queue:pop()
-		--local e,s,a,b,c = Events:pull(event.pull(0.0))
 		local src = Events.handlers[entry.src.hash]
 		
 		if (src ~= nil) then
@@ -120,8 +139,6 @@ function interrups(timeout)
 					fireEvent(h, entry)
 				end
 			end
-		--else
-			--event.ignore(s)
 		end
 	end
 end

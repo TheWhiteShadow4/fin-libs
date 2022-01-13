@@ -42,7 +42,10 @@ function defineClass(spec, init)
 		local obj = {}
 		obj.hash = hash()
 		setmetatable(obj,c)
+		--print("instantiate", dump(c, 1))
+		
 		if base then
+			print("has base", base)
 			local parent = base
 			if parent and parent.init then
 				parent.init(obj, ...)
@@ -82,13 +85,19 @@ local table_keys = function(t)
 	return keys
 end
 
+-- Lazy Array. Erstellt bei jeder neuen Indizierung ein neues Objekt
+-- mittels einer Factory Funktion.
+-- Die Factory Funktion kann mit 'next' kaskadiert werden.
 function lazyArray(func, ...)
 	local a = {}
 	local args = {...}
 	setmetatable(a, {
 		__index = function(a, i)
-			if type(i) == "number" and i > 0 then
+			if type(i) == 'number' and i > 0 then
 				local obj = func(table.unpack(args))
+				if type(a.next) == 'function' then
+					obj = a.next(obj)
+				end
 				a[i] = obj
 				return obj
 			else
@@ -147,15 +156,15 @@ end
 function componentFactory(cls, nick)
 	-- Komponente erstellen und ins Netzwerk einfügen.
 	local comp = cls:instantiate()
-	for i,v in pairs(Actor) do
-		comp[i] = v
-	end
-	comp.nick = nick
-	
-	Network[comp.id] = comp
-	if nick ~= nil then
-		if ALIASES[nick] == nil then ALIASES[nick] = {} end
-		table.insert(ALIASES[nick], comp)
+
+	if comp == nil then error("Component instance can not created.") end
+	if comp.id ~= nil then
+		Network[comp.id] = comp
+		comp.nick = nick
+		if nick ~= nil then
+			if ALIASES[nick] == nil then ALIASES[nick] = {} end
+			table.insert(ALIASES[nick], comp)
+		end
 	end
 	return comp
 end
@@ -184,6 +193,11 @@ computer = {
 component = {
 	proxy = function(ids)
 		if type(ids) == 'table' then
+			-- Kaskadiere Lazy Arrays
+			if getmetatable(ids) ~= nil then
+				ids.next = component.proxy
+				return ids
+			end
 			ret = {}
 			for _,id in pairs(ids) do
 				table.insert(ret, component.proxy(id))
@@ -212,6 +226,7 @@ component = {
 					return componentFactory(...).id
 				end, query, nil)
 		else
+			print("findComponent {}")
 			return {}
 		end
 	end
@@ -342,34 +357,30 @@ filesystem = {
 	loadFile = function(path) end,
 }
 
-Actor = {
-	location = {0, 0, 0},
-	scale = {1, 1, 1},
-	rotation = {0, 0, 0},
-	powerConnectors = {},
-	factoryConnectors = {},
-	pipeConnectors = {},
-	inventories = {},
-	networkConnectors = {},
-}
+_Actor = defineClass({base = _Component}, function(p)
+	print("init _Actor")
+	p.location = {0, 0, 0}
+	p.scale = {1, 1, 1}
+	p.rotation = {0, 0, 0}
+end)
 
-function Actor:getPowerConnectors()
+function _Actor:getPowerConnectors()
 	return {}
 end
 
-function Actor:getFactoryConnectors()
+function _Actor:getFactoryConnectors()
 	return {}
 end
 
-function Actor:getPipeConnectors()
+function _Actor:getPipeConnectors()
 	return {}
 end
 
-function Actor:getInventories()
+function _Actor:getInventories()
 	return {}
 end
 
-function Actor:getNetworkConnectors()
+function _Actor:getNetworkConnectors()
 	return {}
 end
 
@@ -497,11 +508,11 @@ function NetworkCard:broadcast(port, ...)
 end
 
 Powerpol = defineClass({
-	base = _Component,
+	base = _Actor,
 	aliase = {"Build_PowerPoleMk1_C"}
 })
 
-function Actor:getPowerConnectors()
+function Powerpol:getPowerConnectors()
 	return {PowerConnection:new({owner=self})}
 end
 
