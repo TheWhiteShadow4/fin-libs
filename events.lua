@@ -116,14 +116,16 @@ function Events:pull(e, s, ...)
 end
 
 function fireEvent(h, entry)
-	h.f(h.context, entry.ev, table.unpack(entry.args))
-	--xpcall(h.f, error_handler, h.context, entry.ev, table.unpack(entry.args))
+	--h.f(h.context, entry.ev, table.unpack(entry.args))
+	xpcall(h.f, error_handler, h.context, entry.ev, table.unpack(entry.args))
 end
 
 function interrups(timeout)
-	timeout = timeout or 0.0
-	while (Events:pull(event.pull(timeout))) do end
+	while (Events:pull(event.pull())) do end
 
+	if timeout and timeout > 0 then
+		Events:pull(event.pull(timeout))
+	end
 	while Events.queue:size() > 0 do
 		local entry = Events.queue:pop()
 		local src = Events.handlers[entry.src.hash]

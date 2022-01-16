@@ -12,6 +12,16 @@ local function localPort(used)
 	return p
 end
 
+local function await(f)
+	local time = computer.millis()
+	repeat
+		interrups(0.05)
+	until f() or computer.millis() > time + TCP_TIMEOUT	
+	if computer.millis() > time + TCP_TIMEOUT then
+		error("Connection timeout", 3)
+	end
+end
+
 
 local ClientSocket = {}
 
@@ -33,6 +43,13 @@ function ClientSocket:send(...)
 	self.tcp.nc:send(self.rec, self.port, ...)
 end
 
+--[[
+vielleicht später mal
+function ClientSocket:sendSync(...)
+	if self.rec == nil then error("Not connected", 2) end
+	self.tcp.nc:send(self.rec, self.port, "FIN", ...)
+end
+--]]
 
 local ServerSocket = {}
 
@@ -102,6 +119,9 @@ function TCP:handler(evt, sender, port, flag, ...)
 		self.nc:close(port)
 		self.cons[port] = nil
 		if con.onClosed ~= nil then con.onClosed(flag, ...) end
+	--elseif flag == "FIN" then
+	--	self.nc:send("ACK")
+	--	if con.onMessage ~= nil then con.onMessage(...) end
 	else
 		if con.onMessage ~= nil then con.onMessage(flag, ...) end
 	end
@@ -125,11 +145,8 @@ function TCP:connect(ip, port)
 	else
 		self.nc:broadcast(port, "SYN", ip, s.srcPort)
 	end
-	local time = computer.millis()
-	repeat
-		interrups(0.1)
-	until s.rec ~= nil or computer.millis() > time + TCP_TIMEOUT
-	if s.rec == nil then error("Connection timeout", 2) end
+	
+	await(function() return s.rec end)
 	return s
 end
 
@@ -137,4 +154,8 @@ function TCP:_close(rec, srcPort, dstPort)
 	if rec ~= nil then self.nc:send(rec, dstPort, "RST") end
 	self.nc:close(srcPort)
 	self.cons[srcPort] = nil
+end
+
+function TCP:__tostring()
+	return "TCP: "..self.ip
 end
