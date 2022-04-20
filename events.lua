@@ -16,6 +16,7 @@ interrups()
 require 'queue'
 _G.Events = {
 	queue = Queue(),
+	futures = {},
 	handlers = {}
 }
 _event_listen = event.listen
@@ -80,6 +81,10 @@ function Events:removeAll(component)
 	end, error_handler)
 end
 
+function Events:on(future, callback, ...)
+	table.insert(Events.futures, {f=future, cb=callback, args={...}})
+end
+
 function event.listen(c, f)
 	if (f) then
 		Events:add(c, '.', f)
@@ -106,7 +111,7 @@ function Events.emit(e, s, ...)
 	end
 end
 
-function Events:pull(e, s, ...)
+function Events:push(e, s, ...)
 	if (e and s) then
 		Events.queue:push({ev=e, src=s, args={...}})
 		return true
@@ -116,20 +121,27 @@ function Events:pull(e, s, ...)
 end
 
 function fireEvent(h, entry)
-	--h.f(h.context, entry.ev, table.unpack(entry.args))
-	xpcall(h.f, error_handler, h.context, entry.ev, table.unpack(entry.args))
+	h.f(h.context, entry.ev, table.unpack(entry.args))
+	--xpcall(h.f, error_handler, h.context, entry.ev, table.unpack(entry.args))
 end
 
 function interrups(timeout)
-	while (Events:pull(event.pull())) do end
+	while (Events:push(event.pull(0))) do end
 
+	for _,e in pairs(Events.futures) do
+		if (e.f:canGet()) then
+			if e.cb ~= nil then e:cb(e.f:get(), table.unpack(e.args)) end
+			Events.futures[_] = nil
+		end
+	end
+	
 	if timeout and timeout > 0 then
-		Events:pull(event.pull(timeout))
+		Events:push(event.pull(timeout))
 	end
 	while Events.queue:size() > 0 do
 		local entry = Events.queue:pop()
 		local src = Events.handlers[entry.src.hash]
-		
+
 		if (src ~= nil) then
 			if (src[entry.ev] ~= nil) then
 				for i,h in pairs(src[entry.ev]) do

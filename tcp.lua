@@ -1,8 +1,19 @@
-
 require 'events'
 
 IP_TABLE = {}
 TCP_TIMEOUT = 3000
+
+--
+-- Verwendung:
+-- tcp = TCP(networkCard, "meineIPoderDNS")
+-- server = tcp:listen(80)  Server hört auf http Port.
+-- server:accept(function(c)
+--     c.onMessage = function(...) end
+-- end)
+--
+-- client = tcp:connect("meineIPoderDNS", 80)  Klient verbindet sich auf http Port.
+-- client.onMessage = function(arg1, arg2) end
+--
 
 local function localPort(used)
 	local p
@@ -81,19 +92,25 @@ function ServerSocket:accept(callback)
 	end
 end
 
+function ServerSocket:sendAll(...)
+	if self.open == false then error("Not open", 2) end
+	self.tcp.nc:send(self.rec, self.port, ...)
+end
+
 TCP = class(function(p, target, ip)
 	if type(target) == 'string' then
 		target = component.proxy(target)
 	end
 	if target == nil or target:getType().name ~= 'NetworkCard_C' then error("Invalid target", 3) end
 	p.nc = target
-	p.ip = ip or target.id
+	p.ip = ip or target.nick or target.ip
 	p.cons = {}
 	Events:add(p.nc, "NetworkMessage", TCP.handler, p)
+	IP_TABLE[p.ip] = target
 end)
 
 function TCP:handler(evt, sender, port, flag, ...)
-	--print("Event", sender, port, flag, ...)
+	--print("Event", sender, port, flag)
 
 	local con = self.cons[port]
 	if con == nil then return end
@@ -134,19 +151,29 @@ function TCP:listen(port)
 	return s
 end
 
-function TCP:connect(ip, port)
+function TCP:connect(ip, port, cb)
+	if ip == nil then error("Invalid ip", 2) end
 	if ip == "::1" then ip = self.ip end
 	local s = ClientSocket:new({tcp = self, ip = ip, port = port})
 	s.srcPort = localPort(self.cons)
 	self.nc:open(s.srcPort)
 	self.cons[s.srcPort] = s
 	if IP_TABLE[ip] ~= nil then
-		self.nc:send(IP_TABLE[ip], port, "SYN", ip, s.srcPort)
+		self.nc:send(IP_TABLE[ip].id, port, "SYN", ip, s.srcPort)
 	else
 		self.nc:broadcast(port, "SYN", ip, s.srcPort)
 	end
 	
-	await(function() return s.rec end)
+	s._time = computer.millis()
+	Events:on({
+		canGet = function()
+			if computer.millis() > s._time + TCP_TIMEOUT then
+				error("Connection timeout", 1)
+			end
+			return s.rec ~= nil
+		end,
+		get = function() return s end},
+		cb)
 	return s
 end
 
