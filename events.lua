@@ -19,8 +19,10 @@ _G.Events = {
 	futures = {},
 	handlers = {}
 }
-_event_listen = event.listen
-_event_ignore = event.ignore
+event.clear()
+
+--_event_listen = event.listen
+--_event_ignore = event.ignore
 
 if error_handler == nil then 
 	error_handler = function(e)
@@ -40,7 +42,7 @@ function Events:add(component, ev, func, context)
 			map[ev] = {}
 			map[ev][func] = eventHandle
 			self.handlers[chash] = map
-			_event_listen(component)
+			event.listen(component)
 		elseif (self.handlers[chash][ev] == nil) then
 			map = {}
 			map[func] = eventHandle
@@ -63,7 +65,7 @@ function Events:remove(component, ev, func)
 					self.handlers[chash][ev] = nil
 				end
 				if (#self.handlers[chash] == 0) then
-					_event_ignore(component)
+					event.ignore(component)
 					self.handlers[chash] = nil
 				end
 			end
@@ -85,21 +87,21 @@ function Events:on(future, callback, ...)
 	table.insert(Events.futures, {f=future, cb=callback, args={...}})
 end
 
-function event.listen(c, f)
-	if (f) then
-		Events:add(c, '.', f)
-	else
-		error("Unsupported operation.")
-	end
-end
+--function event.listen(c, f)
+--	if (f) then
+--		Events:add(c, '.', f)
+--	else
+--		error("Unsupported operation.")
+--	end
+--end
 
-function event.ignore(c, f)
-	if (f) then
-		Events:remove(c, '.', f)
-	else
-		error("Unsupported operation.")
-	end
-end
+--function event.ignore(c, f)
+--	if (f) then
+--		Events:remove(c, '.', f)
+--	else
+--		error("Unsupported operation.")
+--	end
+--end
 
 function event.ignoreAll()
 	error("Unsupported operation.")

@@ -2,17 +2,10 @@ require 'tcp'
 
 XSCREEN_PORT = 12
 
-pack = function(obj)
-	return ""
-end
-
-unpack = function(str)
-	return {}
-end
-
 -- Server, wo gezeichnet wird.
 XServer = class(function(p, tcp)
 	p.tcp = tcp
+	p.clients = {}
 	p.onInit = nil -- Muss überschriben werden!
 	p.onUpdate = nil -- Für dynamische Inhalte.
 end)
@@ -39,8 +32,10 @@ function XServer:start(port)
 			if cmd == "draw" then
 				local gui = XGui()
 				self.onInit(gui)
-				self.onUpdate(gui)
+				self.onUpdate(gui, true)
 				c:send(gui.buf)
+			elseif cmd == "ping" then
+				c:send("pong")
 			end
 		end
 		c.onClosed = function()
@@ -81,7 +76,7 @@ end
 
 function XServer:update()
 	local gui = XGui()
-	self.onUpdate(gui)
+	self.onUpdate(gui, false)
 	for _,c in pairs(self.clients) do
 		c:send(gui.buf)
 	end
@@ -91,10 +86,19 @@ function XClient:connect(ip, port, cb)
 	port = port or XSCREEN_PORT
 	self.client = self.tcp:connect(ip, port, cb)
 	self.client.onMessage = function(buf, ...)
-		print("update screen")
+		if buf == "pong" then return end
+		--print("update screen")
 		if self.gui == nil then return end
 		_G['_g'] = self.gui
 		load(buf)()
 		self.gui:flush()
 	end
+end
+
+function XClient:ping()
+	self.client:send("ping")
+end
+
+function XClient:refresh()
+	self.client:send("draw")
 end

@@ -23,17 +23,6 @@ local function localPort(used)
 	return p
 end
 
-local function await(f)
-	local time = computer.millis()
-	repeat
-		interrups(0.05)
-	until f() or computer.millis() > time + TCP_TIMEOUT	
-	if computer.millis() > time + TCP_TIMEOUT then
-		error("Connection timeout", 3)
-	end
-end
-
-
 local ClientSocket = {}
 
 function ClientSocket:new(o)
